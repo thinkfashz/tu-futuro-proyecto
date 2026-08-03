@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>tufuturoproyecto — Construcción en el Maule, Talca</title>
+<meta name="description" content="tufuturoproyecto — Construimos tu futuro en el Maule, Talca. Más de 100 proyectos entregados. Cotiza tu casa por m² con calculadora instantánea.">
+<meta name="theme-color" content="#070710">
+<meta property="og:type" content="website">
+<meta property="og:title" content="tufuturoproyecto — Construcción en el Maule">
+<meta property="og:description" content="Más de 100 hogares construidos en el Maule, Talca. Cotiza por m² al instante.">
+<meta property="og:image" content="logo.svg">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#070710; --bg2:#0d0d18;
+  --fg:#f0ede8;
+  --muted:rgba(240,237,232,0.72);
+  --muted2:rgba(240,237,232,0.48);
+  --accent:#c9a96e; --accent2:#e8d5a3;
+  --accentdim:rgba(201,169,110,0.25);
+  --line:rgba(240,237,232,0.12);
+  --fd:Syne,sans-serif; --fb:'Space Grotesk',sans-serif;
+  --ease:cubic-bezier(0.16,1,0.3,1);
+}
+
+html{-webkit-text-size-adjust:100%;height:100%}
+body{
+  background:var(--bg);color:var(--fg);font-family:var(--fb);
+  font-weight:300;overflow-x:hidden;height:100%;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  line-height:1.65;overscroll-behavior:none;
+}
+
+/* ===== CANVAS ===== */
+#frame-canvas{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;display:block}
+#three-canvas{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1;pointer-events:none;opacity:0.12}
+
+#overlay-gradient{
+  position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,rgba(7,7,16,0.5) 0%,rgba(7,7,16,0.08) 18%,rgba(7,7,16,0.08) 82%,rgba(7,7,16,0.6) 100%),
+    radial-gradient(ellipse 130% 90% at center,rgba(7,7,16,0) 60%,rgba(7,7,16,0.22) 100%);
+}
+
+/* ===== SECCIONES ===== */
+.fixed-section{
+  position:fixed;inset:0;height:100svh;z-index:5;
+  opacity:0;display:flex;align-items:center;justify-content:center;
+  padding:0 2rem;pointer-events:none;
+  transition:opacity 0.15s ease;will-change:opacity;
+}
+.fixed-section.active{pointer-events:auto}
+
+/* Fondo difuminado local por bloque */
+.section-content{
+  width:100%;max-width:860px;margin:0 auto;text-align:center;position:relative;
+}
+.section-content::before{
+  content:'';position:absolute;inset:-2rem -3rem;z-index:-1;
+  background:radial-gradient(ellipse 75% 85% at center,rgba(7,7,16,0.82) 0%,rgba(7,7,16,0.45) 50%,rgba(7,7,16,0) 100%);
+  border-radius:28px;pointer-events:none;
+}
+@media(max-width:768px){
+  .section-content::before{inset:-1.5rem -1rem;border-radius:20px;background:radial-gradient(ellipse 88% 85% at center,rgba(7,7,16,0.86) 0%,rgba(7,7,16,0.5) 50%,rgba(7,7,16,0) 100%)}
+}
+
+/* ===== ICONO ===== */
+.section-icon{
+  width:56px;height:56px;margin:0 auto 1.5rem;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--accentdim);border-radius:50%;color:var(--accent);
+}
+.section-icon svg{width:28px;height:28px}
+@media(max-width:768px){.section-icon{width:48px;height:48px;margin-bottom:1.2rem}.section-icon svg{width:24px;height:24px}}
+
+/* ===== SECTION TITLE ===== */
+.section-title{
+  display:flex;flex-direction:column;position:absolute;top:4.5rem;left:50%;
+  transform:translateX(-50%);z-index:6;gap:0.3rem;align-items:center;text-align:center;
+}
+.section-title__id{
+  font-family:var(--fb);font-size:0.62rem;letter-spacing:0.3em;text-transform:uppercase;font-weight:600;
+  background:linear-gradient(90deg,var(--accent2),var(--accent));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.section-title__label{font-size:0.55rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--muted);font-weight:400}
+@media(max-width:768px){.section-title{top:3.5rem}}
+
+/* ===== TEXT BLOCKS ===== */
+.text-block{max-width:580px;margin:0 auto}
+.text-block h2{
+  font-family:var(--fd);font-size:clamp(1.6rem,5.5vw,4.5rem);font-weight:700;
+  line-height:1.02;letter-spacing:-0.025em;margin-bottom:1.2rem;
+}
+.text-block h2 em{font-style:italic;font-weight:400;color:var(--accent)}
+.text-block p{
+  font-size:clamp(0.82rem,1.9vw,0.96rem);font-weight:400;color:var(--muted);
+  line-height:1.85;letter-spacing:0.01em;max-width:460px;margin:0 auto;
+}
+.text-block .accent-line{width:40px;height:1px;background:var(--accent);margin:1.5rem auto 0}
+
+/* ===== HERO ===== */
+.home-hero{z-index:5}
+.home-hero__title{text-align:center;width:100%}
+.home-hero__title h1{
+  font-family:var(--fd);font-size:clamp(2.2rem,9vw,7rem);font-weight:800;
+  line-height:0.95;letter-spacing:-0.03em;
+}
+.home-hero__title h1 em{font-style:italic;font-weight:400;color:var(--accent)}
+.home-hero__sub{
+  margin-top:1.5rem;font-size:clamp(0.8rem,1.7vw,0.92rem);color:var(--muted);
+  letter-spacing:0.04em;max-width:420px;margin-left:auto;margin-right:auto;line-height:1.75;
+}
+.home-hero__scroll{position:absolute;bottom:1.5rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:0.6rem}
+.home-hero__scroll-label{font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted)}
+.home-hero__scroll-line{width:1px;height:36px;background:linear-gradient(to bottom,var(--accent),transparent);position:relative;overflow:hidden}
+.home-hero__scroll-line::after{content:'';position:absolute;top:0;left:0;width:100%;height:50%;background:var(--accent);animation:scrollDash 2s infinite ease-in-out}
+@keyframes scrollDash{0%{transform:translateY(-100%)}100%{transform:translateY(200%)}}
+
+/* ===== CALCULADORA — seccion 2 ===== */
+.home-calc{z-index:5}
+.calc-container{max-width:760px;width:100%;text-align:center}
+.calc-header{margin-bottom:1.5rem}
+.calc-header h2{font-family:var(--fd);font-size:clamp(1.5rem,4.5vw,3.2rem);font-weight:700;line-height:1;letter-spacing:-0.02em}
+.calc-header h2 em{font-style:italic;color:var(--accent);font-weight:400}
+.calc-header p{color:var(--muted);font-size:clamp(0.78rem,1.6vw,0.88rem);margin-top:0.6rem;font-weight:300;max-width:460px;margin-left:auto;margin-right:auto}
+
+/* Stepper mejorado */
+.calc-selector{display:flex;flex-direction:column;align-items:center;gap:1rem;margin:1.5rem auto 0}
+.calc-stepper{
+  display:flex;align-items:center;
+  border:1px solid var(--line);background:rgba(7,7,16,0.75);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:border-color 0.3s;
+  border-radius:4px;
+}
+.calc-stepper:focus-within{border-color:var(--accent)}
+.calc-stepper__btn{
+  width:52px;height:70px;background:none;border:none;color:var(--accent);
+  font-family:var(--fd);font-size:1.5rem;font-weight:700;cursor:pointer;
+  transition:background 0.2s;display:flex;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.calc-stepper__btn:hover{background:rgba(201,169,110,0.12)}
+.calc-stepper__btn:active{background:rgba(201,169,110,0.25);transform:scale(0.95)}
+.calc-stepper__display{
+  display:flex;align-items:baseline;gap:0.3rem;padding:0 1.3rem;min-width:160px;
+  justify-content:center;border-left:1px solid var(--line);border-right:1px solid var(--line);height:70px;
+}
+.calc-stepper__input{
+  background:none;border:none;outline:none;color:var(--fg);font-family:var(--fd);
+  font-size:2.2rem;font-weight:700;width:90px;text-align:center;
+  -moz-appearance:textfield;letter-spacing:-0.02em;
+}
+.calc-stepper__input::-webkit-outer-spin-button,.calc-stepper__input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.calc-stepper__unit{font-family:var(--fb);font-size:0.9rem;color:var(--muted);font-weight:400}
+
+.calc-range-wrapper{width:100%;max-width:360px;margin-top:0.3rem}
+.calc-range{
+  -webkit-appearance:none;appearance:none;width:100%;height:4px;
+  background:var(--line);outline:none;border-radius:2px;touch-action:manipulation;
+}
+.calc-range::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 0 5px rgba(201,169,110,0.15)}
+.calc-range::-webkit-slider-thumb:hover{transform:scale(1.2);box-shadow:0 0 0 10px rgba(201,169,110,0.2)}
+.calc-range::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:var(--accent);cursor:pointer;border:none;box-shadow:0 0 0 5px rgba(201,169,110,0.15)}
+.range-labels{display:flex;justify-content:space-between;font-size:0.55rem;color:var(--muted2);letter-spacing:0.1em;margin-top:0.4rem}
+
+/* Tier gallery — vertical scroll */
+.calc-tiers{
+  display:flex;flex-direction:column;gap:0.8rem;margin-top:1.2rem;
+  max-height:380px;overflow-y:auto;overflow-x:hidden;
+  scroll-behavior:smooth;padding-right:0.5rem;
+  scrollbar-width:thin;scrollbar-color:var(--accentdim) transparent;
+  -webkit-overflow-scrolling:touch;
+}
+.calc-tiers::-webkit-scrollbar{width:4px}
+.calc-tiers::-webkit-scrollbar-track{background:transparent}
+.calc-tiers::-webkit-scrollbar-thumb{background:var(--accentdim);border-radius:2px}
+.calc-tiers::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+.tier-card{
+  border:1px solid var(--line);padding:1.4rem 1.2rem;text-align:left;position:relative;
+  transition:border-color 0.4s var(--ease),box-shadow 0.4s var(--ease);
+  background:rgba(7,7,16,0.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;border-radius:6px;
+  flex-shrink:0;display:flex;flex-direction:column;
+}
+.tier-card:hover{border-color:var(--accentdim)}
+.tier-card.selected{
+  border-color:var(--accent);
+  box-shadow:0 0 0 1px var(--accent),0 8px 30px rgba(201,169,110,0.18);
+  background:rgba(201,169,110,0.06);
+}
+.tier-card.featured{border-color:var(--accent)}
+.tier-card.featured::before{
+  content:'Mas elegido';position:absolute;top:-9px;right:1rem;
+  background:var(--accent);color:var(--bg);font-size:0.5rem;letter-spacing:0.2em;
+  text-transform:uppercase;padding:0.25rem 0.7rem;font-weight:600;white-space:nowrap;border-radius:2px;
+}
+.tier-card-top{display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem}
+.tier-icon{
+  width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--accentdim);border-radius:50%;color:var(--accent);
+}
+.tier-icon svg{width:22px;height:22px}
+.tier-card.selected .tier-icon{border-color:var(--accent);background:rgba(201,169,110,0.12)}
+.tier-card-info{flex:1}
+.tier-name{font-family:var(--fd);font-size:clamp(0.75rem,1.6vw,0.85rem);letter-spacing:0.15em;text-transform:uppercase;color:var(--fg);margin-bottom:0.2rem;font-weight:700}
+.tier-price{font-family:var(--fd);font-size:clamp(1.3rem,3vw,1.6rem);font-weight:700;color:var(--fg);line-height:1.1;letter-spacing:-0.01em}
+.tier-price .currency{font-size:0.85rem;color:var(--muted);vertical-align:super;font-weight:400}
+.tier-price .per{font-size:0.65rem;color:var(--muted);font-family:var(--fb);font-weight:300}
+.tier-uf{font-size:0.65rem;color:var(--accent);margin-bottom:0.8rem;letter-spacing:0.05em;font-weight:500}
+.tier-features{list-style:none;margin-bottom:0.8rem;display:grid;grid-template-columns:1fr 1fr;gap:0.2rem 1rem}
+@media(max-width:480px){.tier-features{grid-template-columns:1fr}}
+.tier-features li{font-size:clamp(0.62rem,1.3vw,0.7rem);color:var(--muted);padding:0.2rem 0;display:flex;align-items:flex-start;gap:0.4rem;line-height:1.4}
+.tier-features li::before{content:'—';color:var(--accent);flex-shrink:0}
+.tier-total{border-top:1px solid var(--line);padding-top:0.6rem;margin-top:auto;display:flex;justify-content:space-between;align-items:baseline}
+.tier-total .total-label{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted2)}
+.tier-total .total-value{font-family:var(--fd);font-size:clamp(1.1rem,2.5vw,1.25rem);font-weight:700;color:var(--accent);line-height:1.1;letter-spacing:-0.01em}
+.tier-total .total-uf{font-size:0.6rem;color:var(--muted);margin-top:0.15rem;text-align:right}
+
+/* Scroll hint */
+.calc-scroll-hint{
+  display:flex;align-items:center;justify-content:center;gap:0.4rem;
+  font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted2);
+  margin-top:0.5rem;
+}
+.calc-scroll-hint svg{width:14px;height:14px;opacity:0.6}
+
+/* ===== FORM ===== */
+.calc-form{
+  margin-top:1.2rem;padding:1.4rem 1.2rem;
+  border:1px solid var(--line);border-radius:6px;
+  background:rgba(7,7,16,0.75);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  text-align:left;
+}
+.calc-form-title{
+  font-family:var(--fd);font-size:clamp(0.75rem,1.6vw,0.85rem);font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;color:var(--fg);margin-bottom:0.3rem;
+}
+.calc-form-sub{font-size:clamp(0.65rem,1.4vw,0.72rem);color:var(--muted);margin-bottom:1rem;line-height:1.5}
+.calc-form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:0.8rem}
+.calc-form-row.single{grid-template-columns:1fr}
+@media(max-width:480px){.calc-form-row{grid-template-columns:1fr}}
+.calc-field{display:flex;flex-direction:column;gap:0.3rem}
+.calc-field label{font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted2);font-weight:500}
+.calc-field input,.calc-field textarea,.calc-field select{
+  background:rgba(7,7,16,0.6);border:1px solid var(--line);border-radius:4px;
+  padding:0.7rem 0.8rem;color:var(--fg);font-family:var(--fb);font-size:0.82rem;
+  outline:none;transition:border-color 0.3s;
+}
+.calc-field input:focus,.calc-field textarea:focus,.calc-field select:focus{border-color:var(--accent)}
+.calc-field input::placeholder,.calc-field textarea::placeholder{color:var(--muted2)}
+.calc-field textarea{resize:vertical;min-height:60px;font-family:var(--fb)}
+.calc-field select{cursor:pointer;-webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c9a96e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 0.8rem center;padding-right:2rem;
+}
+.calc-summary{
+  margin:0.8rem 0;padding:0.8rem;border:1px solid var(--accentdim);border-radius:4px;
+  background:rgba(201,169,110,0.04);display:flex;justify-content:space-between;align-items:center;
+}
+.calc-summary-label{font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted2)}
+.calc-summary-value{font-family:var(--fd);font-size:clamp(0.9rem,2vw,1.1rem);font-weight:700;color:var(--accent)}
+
+.calc-cta{margin-top:0.8rem}
+.calc-cta-btn{
+  display:flex;width:100%;align-items:center;justify-content:center;gap:0.7rem;padding:1rem 1.5rem;
+  border:1px solid var(--accent);color:var(--accent);text-decoration:none;
+  font-family:var(--fb);font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;font-weight:600;
+  transition:color 0.4s var(--ease);position:relative;overflow:hidden;cursor:pointer;
+  background:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;border-radius:4px;
+}
+.calc-cta-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--accent);transition:left 0.5s var(--ease);z-index:-1}
+.calc-cta-btn:hover{color:var(--bg)}
+.calc-cta-btn:hover::before{left:0}
+.calc-cta-btn svg{width:16px;height:16px;flex-shrink:0}
+.calc-cta-btn .arrow{transition:transform 0.3s}
+.calc-cta-btn:hover .arrow{transform:translateX(4px)}
+.calc-disclaimer{font-size:clamp(0.55rem,1.2vw,0.6rem);color:var(--muted2);letter-spacing:0.03em;margin-top:0.8rem;line-height:1.5;text-align:center}
+
+/* ===== STATS ===== */
+.home-stats{z-index:5}
+.stats-heading{text-align:center;margin-bottom:3rem;max-width:680px;margin-left:auto;margin-right:auto}
+.stats-heading h2{font-family:var(--fd);font-size:clamp(1.6rem,5vw,4rem);font-weight:700;line-height:1;letter-spacing:-0.025em}
+.stats-heading h2 em{font-style:italic;color:var(--accent);font-weight:400}
+.stats-heading p{color:var(--muted);font-size:clamp(0.78rem,1.6vw,0.85rem);margin-top:0.8rem;font-weight:300;line-height:1.7;max-width:460px;margin-left:auto;margin-right:auto}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5rem;width:100%;max-width:880px;margin:0 auto;text-align:center}
+.stat-item{display:flex;flex-direction:column;align-items:center;gap:0.3rem}
+.stat-item .number{font-family:var(--fd);font-size:clamp(2rem,5vw,3.5rem);font-weight:700;color:var(--accent);line-height:1;letter-spacing:-0.02em}
+.stat-item .number em{font-style:italic;font-weight:400}
+.stat-item .number sup{font-size:0.35em;vertical-align:super;color:var(--accent2)}
+.stat-item .label{font-size:clamp(0.55rem,1.2vw,0.62rem);letter-spacing:0.22em;text-transform:uppercase;color:var(--muted);font-weight:400;margin-top:0.4rem}
+
+/* ===== CTA ===== */
+.home-cta{z-index:5}
+.cta-content{max-width:780px;margin:0 auto;text-align:center}
+.home-cta h2{font-family:var(--fd);font-size:clamp(2rem,7vw,5.5rem);font-weight:800;line-height:0.95;letter-spacing:-0.03em;margin-bottom:1.5rem;max-width:780px;margin-left:auto;margin-right:auto}
+.home-cta h2 em{font-style:italic;color:var(--accent);font-weight:400}
+.cta-button{
+  display:inline-flex;align-items:center;gap:0.7rem;padding:1rem 2.2rem;
+  border:1px solid var(--accent);color:var(--accent);text-decoration:none;
+  font-family:var(--fb);font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;font-weight:600;
+  transition:color 0.4s var(--ease);position:relative;overflow:hidden;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;border-radius:3px;
+}
+.cta-button::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--accent);transition:left 0.5s var(--ease);z-index:-1}
+.cta-button:hover{color:var(--bg)}
+.cta-button:hover::before{left:0}
+.cta-button svg{width:18px;height:18px}
+.cta-button .arrow{transition:transform 0.3s}
+.cta-button:hover .arrow{transform:translateX(4px)}
+.social-links{display:flex;justify-content:center;gap:1rem;margin-top:2rem}
+.social-link{width:42px;height:42px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);color:var(--muted);text-decoration:none;transition:all 0.4s var(--ease);border-radius:50%}
+.social-link svg{width:18px;height:18px}
+.social-link:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
+
+/* ===== FOOTER ===== */
+.home-footer{z-index:5;display:flex!important;flex-direction:column!important;align-items:center;justify-content:center;text-align:center;gap:1.2rem}
+.footer-brand{font-family:var(--fd);font-size:clamp(0.9rem,2vw,1.1rem);font-weight:700;color:var(--fg);letter-spacing:-0.01em}
+.footer-brand span{color:var(--accent)}
+.footer-info{font-size:clamp(0.6rem,1.3vw,0.68rem);color:var(--muted);letter-spacing:0.08em;line-height:1.6}
+.footer-info a{color:var(--accent);text-decoration:none}
+
+/* ===== AUDIO TOGGLE ===== */
+#audio-toggle{
+  position:fixed;bottom:1.5rem;right:1.5rem;z-index:90;
+  width:44px;height:44px;border:1px solid var(--line);background:rgba(7,7,16,0.75);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);
+  transition:border-color 0.3s,color 0.3s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+#audio-toggle:hover{border-color:var(--accent);color:var(--accent)}
+#audio-toggle.playing{border-color:var(--accent);color:var(--accent)}
+#audio-toggle svg{width:20px;height:20px}
+
+/* ===== SCROLLBAR ===== */
+.scrollbar{position:fixed;right:1.2rem;top:50%;transform:translateY(-50%);width:2px;height:100px;z-index:50;background:var(--line);overflow:hidden}
+.scrollbar__fill{width:100%;height:0%;background:linear-gradient(to bottom,var(--accent),var(--accent2));transition:height 0.1s linear}
+
+/* ===== LOADER ===== */
+#loader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;transition:opacity 0.6s var(--ease),visibility 0.6s var(--ease)}
+#loader.hidden{opacity:0;visibility:hidden}
+.loader-text{font-family:var(--fd);font-size:clamp(1.1rem,3vw,1.5rem);font-weight:700;letter-spacing:-0.01em;color:var(--fg)}
+.loader-text span{color:var(--accent)}
+.loader-bar{width:160px;height:1px;background:var(--line);overflow:hidden}
+.loader-bar-fill{height:100%;width:0%;background:var(--accent);transition:width 0.1s ease}
+.loader-percent{font-size:0.58rem;letter-spacing:0.2em;color:var(--muted)}
+
+#scroll-spacer{position:relative;z-index:0;pointer-events:none}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:1024px){.stats-grid{grid-template-columns:repeat(2,1fr);gap:1.5rem}}
+@media(max-width:768px){
+  .header{padding:1rem 1.2rem}
+  .header-nav{position:fixed;top:0;right:0;width:100vw;height:100vh;background:var(--bg);flex-direction:column;justify-content:center;align-items:center;gap:2rem;transform:translateX(100%);transition:transform 0.5s var(--ease);z-index:85}
+  .header-nav.open{transform:translateX(0)}
+  .header-nav a{font-size:0.85rem}
+  .menu-toggle{display:block}
+  .fixed-section{padding:0 1.2rem}
+  .text-block{max-width:100%}
+  .calc-tiers{grid-template-columns:1fr;gap:0.6rem}
+  .tier-card{padding:1.2rem 1rem}
+  .scrollbar{right:0.6rem;height:70px}
+  .calc-stepper__display{padding:0 0.8rem;min-width:130px}
+  .calc-stepper__input{font-size:1.8rem;width:70px}
+  .calc-stepper__btn{width:44px;height:62px}
+  .calc-stepper__display{height:62px}
+  .section-icon{width:44px;height:44px;margin-bottom:1rem}
+  .section-icon svg{width:22px;height:22px}
+  #audio-toggle{bottom:1rem;right:1rem;width:40px;height:40px}
+  #audio-toggle svg{width:18px;height:18px}
+}
+@media(max-width:480px){.stats-grid{grid-template-columns:1fr 1fr;gap:1.2rem}}
+@media(hover:none) and (pointer:coarse){
+  .tier-card:hover{transform:none}
+  .cta-button:hover{color:var(--accent)}.cta-button:hover::before{left:-100%}
+  .social-link:hover{transform:none}
+  .calc-cta-btn:hover{color:var(--accent)}.calc-cta-btn:hover::before{left:-100%}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-text">tu<span>futuro</span>proyecto</div>
+  <div class="loader-bar"><div class="loader-bar-fill" id="loader-bar-fill"></div></div>
+  <div class="loader-percent" id="loader-percent">0%</div>
+</div>
+
+<!-- CANVAS -->
+<canvas id="frame-canvas"></canvas>
+<canvas id="three-canvas"></canvas>
+<div id="overlay-gradient"></div>
+
+<!-- AUDIO TOGGLE -->
+<button id="audio-toggle" aria-label="Musica">
+  <svg id="audio-icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>
+  <svg id="audio-icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:none"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/></svg>
+</button>
+
+<!-- HEADER -->
+<header class="header">
+  <a href="#" class="header-logo">tu<span>futuro</span>proyecto</a>
+  <ul class="header-nav" id="header-nav">
+    <li><a href="#calculadora" data-scroll="calculadora">Calcular</a></li>
+    <li><a href="#proyecto" data-scroll="proyecto">Proyecto</a></li>
+    <li><a href="#maule" data-scroll="maule">El Maule</a></li>
+    <li><a href="#contacto" data-scroll="contacto">Contacto</a></li>
+  </ul>
+  <button class="menu-toggle" id="menu-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+</header>
+
+<div class="scrollbar"><div class="scrollbar__fill" id="scrollbar-fill"></div></div>
+
+<!-- ===== SECTIONS ===== -->
+
+<!-- HERO — seccion 0 -->
+<section class="fixed-section home-hero active" data-section="0">
+  <div class="section-content">
+    <div class="home-hero__title">
+      <h1 class="text-split" data-split data-anim="hero">
+        <span class="text-split__word"><span class="text-split__word-inner">tu</span></span>
+        <em class="text-split__word"><span class="text-split__word-inner">futuro</span></em>
+        <span class="text-split__word"><span class="text-split__word-inner">proyecto</span></span>
+      </h1>
+      <p class="home-hero__sub" data-reveal>Más de 100 hogares construidos en el Maule. Diseñamos, calculamos y construimos tu casa con estándares de ingeniería y acabados premium.</p>
+    </div>
+  </div>
+  <div class="home-hero__scroll" data-reveal>
+    <span class="home-hero__scroll-label">Scroll para descubrir</span>
+    <div class="home-hero__scroll-line"></div>
+  </div>
+</section>
+
+<!-- 01 — CALCULADORA (seccion 2 del flow) -->
+<section class="fixed-section home-calc" data-section="1" id="calculadora">
+  <div class="section-content" style="max-width:760px;">
+    <div class="calc-container">
+      <div class="calc-header">
+        <div class="section-title" style="position:relative;top:auto;left:auto;transform:none;margin-bottom:0.8rem;" data-reveal>
+          <span class="section-title__id">//01</span><span class="section-title__label">Cotizador</span>
+        </div>
+        <h2 class="text-split" data-split data-anim="left">
+          <span class="text-split__word"><span class="text-split__word-inner">Estima</span></span>
+          <span class="text-split__word"><span class="text-split__word-inner">tu</span></span>
+          <em class="text-split__word"><span class="text-split__word-inner">presupuesto</span></em>
+        </h2>
+        <p data-reveal>Selecciona los metros cuadrados y el nivel de terminación. Cotiza directo a WhatsApp.</p>
+      </div>
+      <div class="calc-selector" data-reveal>
+        <div class="calc-stepper">
+          <button class="calc-stepper__btn" id="m2-minus" type="button" aria-label="Restar">−</button>
+          <div class="calc-stepper__display">
+            <input type="number" id="m2-input" value="100" min="40" max="500" step="5" inputmode="numeric">
+            <span class="calc-stepper__unit">m²</span>
+          </div>
+          <button class="calc-stepper__btn" id="m2-plus" type="button" aria-label="Sumar">+</button>
+        </div>
+        <div class="calc-range-wrapper">
+          <input type="range" id="m2-range" class="calc-range" min="40" max="500" value="100" step="5">
+          <div class="range-labels"><span>40 m²</span><span>500 m²</span></div>
+        </div>
+      </div>
+      <div class="calc-tiers">
+        <div class="tier-card" data-tier="inicial" data-reveal>
+          <div class="tier-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-5h6v5"/></svg></div>
+          <div class="tier-name">Inicial</div>
+          <div class="tier-price"><span class="currency">$</span><span>45.000</span> <span class="per">/ m²</span></div>
+          <div class="tier-uf">12,5 UF / m²</div>
+          <ul class="tier-features"><li>Estructura reforzada</li><li>Cielo raso yeso</li><li>Pisos flotantes básicos</li><li>Baño y cocina funcional</li><li>Pintura estándar</li><li>Eléctrica básica</li></ul>
+          <div class="tier-total"><div class="total-label">Total</div><div class="total-value" id="total-inicial">$45.000.000</div><div class="total-uf" id="uf-inicial">1.250 UF</div></div>
+        </div>
+        <div class="tier-card featured selected" data-tier="intermedio" data-reveal>
+          <div class="tier-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h6v8H9z"/></svg></div>
+          <div class="tier-name">Intermedio</div>
+          <div class="tier-price"><span class="currency">$</span><span>68.000</span> <span class="per">/ m²</span></div>
+          <div class="tier-uf">18,9 UF / m²</div>
+          <ul class="tier-features"><li>Todo lo Inicial</li><li>Porcelanatos premium</li><li>Cocina con isla</li><li>Closets empotrados</li><li>Aislación mejorada</li><li>Iluminación LED</li></ul>
+          <div class="tier-total"><div class="total-label">Total</div><div class="total-value" id="total-intermedio">$68.000.000</div><div class="total-uf" id="uf-intermedio">1.890 UF</div></div>
+        </div>
+        <div class="tier-card" data-tier="plus" data-reveal>
+          <div class="tier-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+          <div class="tier-name">Plus</div>
+          <div class="tier-price"><span class="currency">$</span><span>95.000</span> <span class="per">/ m²</span></div>
+          <div class="tier-uf">26,4 UF / m²</div>
+          <ul class="tier-features"><li>Todo lo Intermedio</li><li>Pisos naturales</li><li>Electrodomésticos</li><li>Walk-in closets</li><li>Grifería premium</li><li>Climatización zonas</li><li>Diseño interior</li><li>Paisajismo</li></ul>
+          <div class="tier-total"><div class="total-label">Total</div><div class="total-value" id="total-plus">$95.000.000</div><div class="total-uf" id="uf-plus">2.640 UF</div></div>
+        </div>
+      </div>
+      <p class="calc-disclaimer" data-reveal>* Valores referenciales. UF al valor del día.</p>
+      <div class="calc-cta" data-reveal>
+        <button class="calc-cta-btn" id="calc-quote-btn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          <span>Cotizar en WhatsApp</span><span class="arrow">→</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 — Nuestro Proyecto -->
+<section class="fixed-section" data-section="2" id="proyecto">
+  <div class="section-title" data-reveal><span class="section-title__id">//02</span><span class="section-title__label">Nuestro Proyecto</span></div>
+  <div class="section-content">
+    <div class="text-block">
+      <div class="section-icon" data-reveal>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 11h.01M15 11h.01"/></svg>
+      </div>
+      <h2 class="text-split" data-split data-anim="right">
+        <span class="text-split__word"><span class="text-split__word-inner">Construimos</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">con</span></span>
+        <em class="text-split__word"><span class="text-split__word-inner">tu futuro</span></em>
+        <span class="text-split__word"><span class="text-split__word-inner">en</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">cada</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">detalle</span></span>
+      </h2>
+      <p data-reveal>Cada proyecto comienza con una idea y termina con un hogar. Transformamos terrenos vacíos en espacios donde la vida sucede. Precisión de ingeniería, cuidado artesanal.</p>
+      <div class="accent-line" data-reveal></div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="fixed-section" data-section="3">
+  <div class="section-title" data-reveal><span class="section-title__id">//03</span><span class="section-title__label">Nuestra Forma</span></div>
+  <div class="section-content">
+    <div class="text-block">
+      <div class="section-icon" data-reveal>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <h2 class="text-split" data-split data-anim="scale">
+        <span class="text-split__word"><span class="text-split__word-inner">No</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">es</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">solo</span></span>
+        <em class="text-split__word"><span class="text-split__word-inner">construir</span></em>
+        <span class="text-split__word"><span class="text-split__word-inner">Es</span></span>
+        <em class="text-split__word"><span class="text-split__word-inner">proyectar</span></em>
+      </h2>
+      <p data-reveal>Diseño arquitectónico, cálculo estructural, gestión de permisos y construcción llave en mano. Un solo equipo, una sola responsabilidad. Tú visualizas, nosotros materializamos.</p>
+      <div class="accent-line" data-reveal></div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="fixed-section" data-section="4">
+  <div class="section-title" data-reveal><span class="section-title__id">//04</span><span class="section-title__label">Calidad</span></div>
+  <div class="section-content">
+    <div class="text-block">
+      <div class="section-icon" data-reveal>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      </div>
+      <h2 class="text-split" data-split data-anim="bottom">
+        <span class="text-split__word"><span class="text-split__word-inner">Materiales</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">que</span></span>
+        <em class="text-split__word"><span class="text-split__word-inner">duran</span></em>
+        <span class="text-split__word"><span class="text-split__word-inner">tanto</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">como</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">tu</span></span>
+        <em class="text-split__word"><span class="text-split__word-inner">legado</span></em>
+      </h2>
+      <p data-reveal>Acero certificado, hormigón de alta resistencia, aislación térmica de última generación. Cada material se elige pensando en los próximos 50 años, no en los próximos 5.</p>
+      <div class="accent-line" data-reveal></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 Stats -->
+<section class="fixed-section home-stats" data-section="5" id="maule">
+  <div class="section-content" style="max-width:960px;">
+    <div>
+      <div class="stats-heading">
+        <div class="section-title" style="position:relative;top:auto;left:auto;transform:none;margin-bottom:1.2rem;" data-reveal>
+          <span class="section-title__id">//05</span><span class="section-title__label">El Maule · Talca</span>
+        </div>
+        <h2 class="text-split" data-split data-anim="blur">
+          <span class="text-split__word"><span class="text-split__word-inner">Más</span></span>
+          <span class="text-split__word"><span class="text-split__word-inner">de</span></span>
+          <em class="text-split__word"><span class="text-split__word-inner">100</em>
+          <span class="text-split__word"><span class="text-split__word-inner">proyectos</span></span>
+          <span class="text-split__word"><span class="text-split__word-inner">en</span></span>
+          <span class="text-split__word"><span class="text-split__word-inner">el</span></span>
+          <em class="text-split__word"><span class="text-split__word-inner">Maule</span></em>
+        </h2>
+        <p data-reveal>Una década construyendo hogares en Talca y toda la Región del Maule. Cada proyecto es una familia, cada entrega una promesa cumplida.</p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-item" data-reveal><div class="number" data-target="100" data-suffix="+"><em>+</em>100</div><div class="label">Proyectos entregados</div></div>
+        <div class="stat-item" data-reveal><div class="number" data-target="10">10</div><div class="label">Años de experiencia</div></div>
+        <div class="stat-item" data-reveal><div class="number" data-target="100" data-suffix="%">100<sup>%</sup></div><div class="label">Clientes satisfechos</div></div>
+        <div class="stat-item" data-reveal><div class="number">Talca</div><div class="label">Sede principal</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="fixed-section" data-section="6">
+  <div class="section-title" data-reveal><span class="section-title__id">//06</span><span class="section-title__label">Confianza</span></div>
+  <div class="section-content">
+    <div class="text-block">
+      <div class="section-icon" data-reveal>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <h2 class="text-split" data-split data-anim="rotate">
+        <span class="text-split__word"><span class="text-split__word-inner">De</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">la</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">idea</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">a</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">las</span></span>
+        <em class="text-split__word"><span class="text-split__word-inner">llaves</span></em>
+      </h2>
+      <p data-reveal>Sabemos que construir es una de las decisiones más importantes de tu vida. Por eso acompañamos cada etapa con transparencia total: presupuestos claros, plazos reales, comunicación constante.</p>
+      <div class="accent-line" data-reveal></div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="fixed-section" data-section="7">
+  <div class="section-title" data-reveal><span class="section-title__id">//07</span><span class="section-title__label">Diseño</span></div>
+  <div class="section-content">
+    <div class="text-block">
+      <div class="section-icon" data-reveal>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12h18M12 3v18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><circle cx="12" cy="12" r="4"/></svg>
+      </div>
+      <h2 class="text-split" data-split data-anim="left">
+        <span class="text-split__word"><span class="text-split__word-inner">Casas</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">que</span></span>
+        <em class="text-split__word"><span class="text-split__word-inner">respiran</span></em>
+        <span class="text-split__word"><span class="text-split__word-inner">contigo</span></span>
+      </h2>
+      <p data-reveal>Arquitectura que integra luz natural, ventilación cruzada y eficiencia energética. Diseñamos para el clima del Maule, aprovechando cada estación para que tu hogar sea confortable todo el año.</p>
+      <div class="accent-line" data-reveal></div>
+    </div>
+  </div>
+</section>
+
+<!-- 08 CTA -->
+<section class="fixed-section home-cta" data-section="8" id="contacto">
+  <div class="section-content">
+    <div class="cta-content">
+      <div class="section-icon" data-reveal style="margin-bottom:1.5rem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+      </div>
+      <h2 class="text-split" data-split data-anim="right">
+        <span class="text-split__word"><span class="text-split__word-inner">Tu</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">hogar</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">empieza</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">con</span></span>
+        <span class="text-split__word"><span class="text-split__word-inner">una</span></span>
+        <em class="text-split__word"><span class="text-split__word-inner">conversación</span></em>
+      </h2>
+      <a href="https://wa.me/56920688075?text=Hola%2C%20quiero%20cotizar%20mi%20proyecto%20con%20tufuturoproyecto" class="cta-button" target="_blank" rel="noopener" data-reveal>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        <span>Cotiza ahora</span><span class="arrow">→</span>
+      </a>
+      <div class="social-links" data-reveal>
+        <a href="https://instagram.com/tufuturoproyecto" class="social-link" target="_blank" rel="noopener" aria-label="Instagram"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
+        <a href="https://facebook.com/tufuturoproyecto" class="social-link" target="_blank" rel="noopener" aria-label="Facebook"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+        <a href="https://wa.me/56920688075" class="social-link" target="_blank" rel="noopener" aria-label="WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<section class="fixed-section home-footer" data-section="9">
+  <div class="footer-brand">tu<span>futuro</span>proyecto</div>
+  <div class="footer-info">Talca, Región del Maule · Chile<br><a href="https://wa.me/56920688075">+56 9 2068 8075</a> · <a href="mailto:contacto@tufuturoproyecto.cl">contacto@tufuturoproyecto.cl</a></div>
+</section>
+
+<div id="scroll-spacer" style="height:1400vh;"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+const TOTAL_SECTIONS = 10;
+const WHATSAPP = '56920688075';
+const FRAMES_DIR = 'frame/movil/webp/';
+const TOTAL_FRAMES = 237;
+
+/* ===== AMBIENT MUSIC — Web Audio API, royalty-free, sin archivo ===== */
+let audioCtx = null, audioPlaying = false, audioNodes = [];
+function initAmbientMusic() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0;
+  masterGain.connect(audioCtx.destination);
+
+  // Acordes ambient en tono dorado/elegante (Am - F - C - G)
+  const chords = [
+    [220.00, 261.63, 329.63],   // Am
+    [174.61, 220.00, 261.63],   // F
+    [261.63, 329.63, 392.00],   // C
+    [196.00, 246.94, 293.66],   // G
+  ];
+
+  let chordIdx = 0;
+  function playChord() {
+    if (!audioPlaying) return;
+    const chord = chords[chordIdx];
+    const now = audioCtx.currentTime;
+
+    chord.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.04, now + 2);
+      gain.gain.linearRampToValueAtTime(0, now + 8);
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 800;
+
+      osc.connect(filter); filter.connect(gain); gain.connect(masterGain);
+      osc.start(now); osc.stop(now + 8);
+    });
+
+    chordIdx = (chordIdx + 1) % chords.length;
+    setTimeout(playChord, 6000);
+  }
+
+  audioNodes.push(masterGain);
+  playChord();
+
+  // Fade in
+  masterGain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 2);
+}
+
+const audioToggle = document.getElementById('audio-toggle');
+const audioIconOff = document.getElementById('audio-icon-off');
+const audioIconOn = document.getElementById('audio-icon-on');
+audioToggle.addEventListener('click', () => {
+  if (!audioCtx) {
+    initAmbientMusic();
+    audioPlaying = true;
+    audioToggle.classList.add('playing');
+    audioIconOff.style.display = 'none';
+    audioIconOn.style.display = 'block';
+  } else {
+    audioPlaying = !audioPlaying;
+    audioToggle.classList.toggle('playing', audioPlaying);
+    audioIconOff.style.display = audioPlaying ? 'none' : 'block';
+    audioIconOn.style.display = audioPlaying ? 'block' : 'none';
+    if (audioPlaying) initAmbientMusic();
+  }
+});
+
+/* ===== 1. LENIS ===== */
+const lenis = new Lenis({
+  duration: 0.9,
+  easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+  smoothWheel: true, smoothTouch: true, touchMultiplier: 1.5, infinite: false,
+});
+function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+requestAnimationFrame(raf);
+
+/* ===== 2. CANVAS FRAME PLAYER ===== */
+const canvas = document.getElementById('frame-canvas');
+const ctx = canvas.getContext('2d');
+let currentFrameIndex = -1;
+
+function resizeCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  canvas.width = vw * dpr; canvas.height = vh * dpr;
+  canvas.style.width = vw + 'px'; canvas.style.height = vh + 'px';
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(dpr, dpr);
+}
+resizeCanvas();
+
+const frames = [];
+let loadedCount = 0;
+const loaderFill = document.getElementById('loader-bar-fill');
+const loaderPercent = document.getElementById('loader-percent');
+const loader = document.getElementById('loader');
+
+function pad(n) { return String(n).padStart(3, '0'); }
+
+function preloadFrames() {
+  for (let i = 1; i <= TOTAL_FRAMES; i++) {
+    const img = new Image();
+    img.onload = () => onFrameLoad();
+    img.onerror = () => onFrameLoad();
+    img.src = FRAMES_DIR + pad(i) + '.webp';
+    frames[i - 1] = img;
+  }
+}
+
+function onFrameLoad() {
+  loadedCount++;
+  const pct = Math.round((loadedCount / TOTAL_FRAMES) * 100);
+  loaderFill.style.width = pct + '%';
+  loaderPercent.textContent = pct + '%';
+  if (loadedCount === TOTAL_FRAMES) {
+    setTimeout(() => {
+      loader.classList.add('hidden');
+      drawFrame(0);
+      initScrollEngine();
+    }, 200);
+  }
+}
+
+function drawFrame(index) {
+  if (index === currentFrameIndex) return;
+  const img = frames[index];
+  if (!img || !img.complete || img.naturalWidth === 0) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const imgW = img.naturalWidth, imgH = img.naturalHeight;
+  const imgAspect = imgW / imgH;
+  const screenAspect = vw / vh;
+  let drawW, drawH, drawX, drawY;
+  if (screenAspect > imgAspect) {
+    drawW = vw; drawH = vw / imgAspect; drawX = 0; drawY = (vh - drawH) / 2;
+  } else {
+    drawH = vh; drawW = vh * imgAspect; drawX = (vw - drawW) / 2; drawY = 0;
+  }
+  ctx.clearRect(0, 0, vw, vh);
+  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  currentFrameIndex = index;
+}
+
+/* ===== 3. SCROLL ENGINE ===== */
+const sections = document.querySelectorAll('.fixed-section');
+const scrollbarFill = document.getElementById('scrollbar-fill');
+
+function updateActiveSection() {
+  const spacer = document.getElementById('scroll-spacer');
+  const total = spacer.offsetHeight;
+  const sy = window.scrollY;
+  const pct = total > 0 ? sy / total : 0;
+  const idx = Math.max(0, Math.min(TOTAL_SECTIONS - 1, Math.floor(pct * TOTAL_SECTIONS + 0.001)));
+  sections.forEach((sec, i) => {
+    if (i === idx) { sec.classList.add('active'); gsap.set(sec, { opacity: 1, scale: 1 }); }
+    else { sec.classList.remove('active'); gsap.set(sec, { opacity: 0, scale: 1 }); }
+  });
+}
+
+lenis.on('scroll', ScrollTrigger.update);
+lenis.on('scroll', updateActiveSection);
+gsap.ticker.add((time) => lenis.raf(time * 1000));
+gsap.ticker.lagSmoothing(0);
+
+function initScrollEngine() {
+  ScrollTrigger.create({
+    trigger: '#scroll-spacer', start: 'top top', end: 'bottom bottom', scrub: 0.2,
+    onUpdate: (self) => {
+      const p = self.progress;
+      const fi = Math.min(TOTAL_FRAMES - 1, Math.round(p * (TOTAL_FRAMES - 1)));
+      drawFrame(fi);
+      scrollbarFill.style.height = (p * 100) + '%';
+    },
+  });
+
+  sections.forEach((sec, i) => {
+    const words = sec.querySelectorAll('.text-split__word-inner');
+    const reveals = sec.querySelectorAll('[data-reveal]');
+    const anim = sec.querySelector('[data-anim]')?.dataset.anim || 'hero';
+
+    gsap.set(words, { y: '110%', opacity: 0 });
+    gsap.set(reveals, { opacity: 0, y: 25, filter: 'blur(6px)' });
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#scroll-spacer',
+        start: `top+=${(i / TOTAL_SECTIONS) * 100}% top`,
+        end: `top+=${((i + 0.12) / TOTAL_SECTIONS) * 100}% top`,
+        scrub: 0.3,
+        onEnter: () => { gsap.set(sec, { opacity: 1 }); },
+        onLeaveBack: () => { if (i > 0) gsap.set(sec, { opacity: 0 }); },
+        onComplete: () => {
+          gsap.set(words, { y: '0%', opacity: 1 });
+          gsap.set(reveals, { opacity: 1, y: 0, filter: 'blur(0px)' });
+        },
+      },
+    });
+
+    switch (anim) {
+      case 'hero': tl.to(words, { y: '0%', opacity: 1, duration: 0.7, ease: 'power3.out', stagger: 0.05 }, 0); break;
+      case 'left': tl.fromTo(words, { x: '-60px', y: '0%', opacity: 0 }, { x: '0px', opacity: 1, duration: 0.6, ease: 'power3.out', stagger: 0.04 }, 0); break;
+      case 'right': tl.fromTo(words, { x: '60px', y: '0%', opacity: 0 }, { x: '0px', opacity: 1, duration: 0.6, ease: 'power3.out', stagger: 0.04 }, 0); break;
+      case 'scale': tl.fromTo(words, { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.7, ease: 'back.out(1.4)', stagger: 0.04 }, 0); break;
+      case 'bottom': tl.to(words, { y: '0%', opacity: 1, duration: 0.7, ease: 'power4.out', stagger: 0.06 }, 0); break;
+      case 'blur': tl.fromTo(words, { filter: 'blur(15px)', opacity: 0, scale: 1.05 }, { filter: 'blur(0px)', opacity: 1, scale: 1, duration: 0.7, ease: 'power2.out', stagger: 0.05 }, 0); break;
+      case 'rotate': tl.fromTo(words, { rotationY: -90, opacity: 0 }, { rotationY: 0, opacity: 1, duration: 0.7, ease: 'power3.out', stagger: 0.04 }, 0); break;
+      default: tl.to(words, { y: '0%', opacity: 1, duration: 0.7, ease: 'power3.out', stagger: 0.04 }, 0);
+    }
+    tl.to(reveals, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power2.out', stagger: 0.05 }, 0.1);
+  });
+
+  document.querySelectorAll('.stat-item .number[data-target]').forEach((el) => {
+    const target = parseInt(el.dataset.target);
+    const suffix = el.dataset.suffix || '';
+    const obj = { val: 0 };
+    gsap.to(obj, {
+      val: target, duration: 1.5, ease: 'power2.out',
+      scrollTrigger: {
+        trigger: '#scroll-spacer',
+        start: `top+=${(5 / TOTAL_SECTIONS) * 100}% top`,
+        end: `top+=${((5 + 0.25) / TOTAL_SECTIONS) * 100}% top`,
+        scrub: 0.8,
+      },
+      onUpdate: () => {
+        if (suffix === '%') el.innerHTML = Math.round(obj.val) + '<sup>%</sup>';
+        else if (suffix === '+') el.innerHTML = '<em>+</em>' + Math.round(obj.val);
+        else el.textContent = Math.round(obj.val);
+      },
+    });
+  });
+
+  ScrollTrigger.refresh();
+  updateActiveSection();
+}
+
+/* ===== 4. THREE.js PARTICLES ===== */
+const threeCanvas = document.getElementById('three-canvas');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, alpha: true, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+camera.position.z = 50;
+
+const pCount = window.innerWidth < 768 ? 30 : 60;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(pCount * 3);
+const pVel = [];
+for (let i = 0; i < pCount; i++) {
+  pPos[i*3] = (Math.random()-0.5)*120;
+  pPos[i*3+1] = (Math.random()-0.5)*80;
+  pPos[i*3+2] = (Math.random()-0.5)*60;
+  pVel.push({ x:(Math.random()-0.5)*0.012, y:(Math.random()-0.5)*0.008, z:(Math.random()-0.5)*0.006 });
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({ color: 0xc9a96e, size: 0.4, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+const particles = new THREE.Points(pGeo, pMat);
+scene.add(particles);
+
+let mx = 0, my = 0;
+window.addEventListener('mousemove', (e) => { mx = (e.clientX/innerWidth-0.5)*0.4; my = (e.clientY/innerHeight-0.5)*0.4; });
+
+function animParticles() {
+  requestAnimationFrame(animParticles);
+  const a = pGeo.attributes.position.array;
+  for (let i = 0; i < pCount; i++) {
+    a[i*3]+=pVel[i].x; a[i*3+1]+=pVel[i].y; a[i*3+2]+=pVel[i].z;
+    if (a[i*3]>60) a[i*3]=-60; if (a[i*3]<-60) a[i*3]=60;
+    if (a[i*3+1]>40) a[i*3+1]=-40; if (a[i*3+1]<-40) a[i*3+1]=40;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  camera.position.x += (mx*5-camera.position.x)*0.03;
+  camera.position.y += (-my*5-camera.position.y)*0.03;
+  camera.lookAt(scene.position);
+  renderer.render(scene, camera);
+}
+animParticles();
+
+/* ===== 5. RESIZE ===== */
+let rt;
+window.addEventListener('resize', () => {
+  clearTimeout(rt);
+  rt = setTimeout(() => {
+    resizeCanvas();
+    drawFrame(currentFrameIndex < 0 ? 0 : currentFrameIndex);
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    ScrollTrigger.refresh();
+  }, 150);
+});
+
+/* ===== 6. CALCULATOR ===== */
+const m2Input = document.getElementById('m2-input');
+const m2Range = document.getElementById('m2-range');
+const m2Minus = document.getElementById('m2-minus');
+const m2Plus = document.getElementById('m2-plus');
+const calcQuoteBtn = document.getElementById('calc-quote-btn');
+
+const tierData = {
+  inicial: { perm2: 450000, ufperm2: 12.5, name: 'Inicial' },
+  intermedio: { perm2: 680000, ufperm2: 18.9, name: 'Intermedio' },
+  plus: { perm2: 950000, ufperm2: 26.4, name: 'Plus' },
+};
+
+let selectedTier = 'intermedio';
+
+function fmtCLP(v) { return '$' + Math.round(v).toLocaleString('es-CL'); }
+function fmtUF(v) { return v.toLocaleString('es-CL', { maximumFractionDigits: 0 }) + ' UF'; }
+
+let tweens = {};
+
+function updateCalc() {
+  const m2 = Math.max(40, Math.min(500, parseFloat(m2Input.value) || 40));
+  m2Range.value = m2;
+  if (document.activeElement !== m2Input) m2Input.value = m2;
+
+  Object.keys(tierData).forEach((id) => {
+    const t = tierData[id];
+    const totalCLP = m2 * t.perm2;
+    const totalUF = m2 * t.ufperm2;
+    const tEl = document.getElementById('total-' + id);
+    const uEl = document.getElementById('uf-' + id);
+    if (tweens[id]) tweens[id].kill();
+    const cur = parseFloat(tEl.textContent.replace(/[^0-9]/g, '')) || 0;
+    const obj = { val: cur };
+    tweens[id] = gsap.to(obj, {
+      val: totalCLP, duration: 0.35, ease: 'power2.out',
+      onUpdate: () => { tEl.textContent = fmtCLP(obj.val); },
+    });
+    uEl.textContent = fmtUF(totalUF);
+  });
+
+  document.querySelectorAll('.tier-card').forEach((c) => {
+    c.classList.toggle('selected', c.dataset.tier === selectedTier);
+  });
+}
+
+m2Input.addEventListener('input', updateCalc);
+m2Input.addEventListener('change', updateCalc);
+m2Range.addEventListener('input', () => { m2Input.value = m2Range.value; updateCalc(); });
+m2Minus.addEventListener('click', () => { m2Input.value = Math.max(40, (parseInt(m2Input.value) || 100) - 5); updateCalc(); });
+m2Plus.addEventListener('click', () => { m2Input.value = Math.min(500, (parseInt(m2Input.value) || 100) + 5); updateCalc(); });
+
+document.querySelectorAll('.tier-card').forEach((card) => {
+  card.addEventListener('click', () => { selectedTier = card.dataset.tier; updateCalc(); });
+});
+
+calcQuoteBtn.addEventListener('click', () => {
+  const m2 = Math.max(40, Math.min(500, parseFloat(m2Input.value) || 100));
+  const t = tierData[selectedTier];
+  const totalCLP = m2 * t.perm2;
+  const totalUF = m2 * t.ufperm2;
+  const msg = `*Cotizacion tufuturoproyecto*\n\nHola! Quiero cotizar mi proyecto.\n\n*Metros cuadrados:* ${m2} m2\n*Nivel de terminacion:* ${t.name}\n*Valor m2:* ${fmtCLP(t.perm2)}\n*Total estimado:* ${fmtCLP(totalCLP)} (${fmtUF(totalUF)})\n\nQuiero mas informacion para empezar.`;
+  window.open(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`, '_blank');
+});
+
+updateCalc();
+
+/* ===== 7. NAV ===== */
+document.querySelectorAll('[data-scroll]').forEach((link) => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const targetSec = document.getElementById(link.dataset.scroll);
+    if (targetSec) {
+      const idx = parseInt(targetSec.dataset.section);
+      const target = (idx / TOTAL_SECTIONS) * (innerHeight * 14);
+      lenis.scrollTo(target, { duration: 1.5 });
+    }
+    document.getElementById('header-nav').classList.remove('open');
+    document.getElementById('menu-toggle').classList.remove('open');
+  });
+});
+
+/* ===== 8. MOBILE MENU ===== */
+document.getElementById('menu-toggle').addEventListener('click', () => {
+  document.getElementById('header-nav').classList.toggle('open');
+  document.getElementById('menu-toggle').classList.toggle('open');
+});
+
+/* ===== 9. START ===== */
+preloadFrames();
+</script>
+</body>
+</html>
