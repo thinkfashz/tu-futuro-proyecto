@@ -1,0 +1,79 @@
+name: Fix scroll cache jank
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/fix-scroll-cache-jank.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Patch frame memory and idle cache scheduling
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          s = s.replace(
+            "let current=0,last=null,lastIndex=-1,active=0,drawRaf=0,target=0,stableW=innerWidth,stableH=innerHeight,currentScene=-1,lastRequested=-1,lastDirection=1;",
+            "let current=0,last=null,lastIndex=-1,active=0,drawRaf=0,target=0,stableW=innerWidth,stableH=innerHeight,currentScene=-1,lastRequested=-1,lastDirection=1,loadedSinceTrim=0,cacheResumeTimer=0,cacheQueued=false;"
+          )
+
+          s = s.replace(
+            "function paint(img,i){if(!img||!img.naturalWidth)return false;",
+            "function trimDecodedFrames(){if(!coarse)return;let count=0;for(const frame of frames)if(frame)count++;if(count<=54)return;for(let i=0;i<FRAME_COUNT;i++){if(!frames[i]||i===lastIndex||Math.abs(i-current)<=26)continue;frames[i]=null;count--;if(count<=44)break}}\nfunction paint(img,i){if(!img||!img.naturalWidth)return false;"
+          )
+
+          s = s.replace(
+            "frames[i]=img;if(!last||Math.abs(i-current)<3)schedule(current);resolve(img)",
+            "frames[i]=img;loadedSinceTrim++;if(loadedSinceTrim>=8){loadedSinceTrim=0;trimDecodedFrames()}if(!last||Math.abs(i-current)<3)schedule(current);resolve(img)"
+          )
+
+          old = "ScrollTrigger.create({trigger:'#cinematic',start:'top top',end:'bottom bottom',scrub:.04,onUpdate:self=>{const p=self.progress,i=Math.round(p*(FRAME_COUNT-1));if(i!==current){const direction=i>current?1:-1;current=i;schedule(i);request(i,direction)}document.getElementById('progress-fill').style.height=(p*100)+'%';let next=-1;for(let n=0;n<scenes.length;n++){if(p>=+scenes[n].dataset.start&&p<=+scenes[n].dataset.end){next=n;break}}showScene(next)}});"
+          new = "function signalScrollActivity(){if(!navigator.serviceWorker?.controller)return;navigator.serviceWorker.controller.postMessage({type:'PAUSE_FRAME_CACHE'});clearTimeout(cacheResumeTimer);cacheResumeTimer=setTimeout(()=>navigator.serviceWorker.controller?.postMessage({type:'RESUME_FRAME_CACHE'}),1400)}\nScrollTrigger.create({trigger:'#cinematic',start:'top top',end:'bottom bottom',scrub:.04,onUpdate:self=>{signalScrollActivity();const p=self.progress,i=Math.round(p*(FRAME_COUNT-1));if(i!==current){const direction=i>current?1:-1;current=i;schedule(i);request(i,direction)}document.getElementById('progress-fill').style.height=(p*100)+'%';let next=-1;for(let n=0;n<scenes.length;n++){if(p>=+scenes[n].dataset.start&&p<=+scenes[n].dataset.end){next=n;break}}showScene(next)}});"
+          if old not in s:
+            raise SystemExit('ScrollTrigger fragment not found')
+          s = s.replace(old, new, 1)
+
+          marker = "showScene(0);"
+          addition = """showScene(0);
+if('serviceWorker' in navigator){
+  window.addEventListener('load',async()=>{
+    try{
+      const registration=await navigator.serviceWorker.register('./sw.js?v=3');
+      await navigator.serviceWorker.ready;
+      const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+      if(connection?.saveData)return;
+      const queueFrames=()=>{
+        if(cacheQueued)return;
+        cacheQueued=true;
+        const urls=Array.from({length:FRAME_COUNT},(_,i)=>new URL(src(i),location.href).href);
+        (registration.active||navigator.serviceWorker.controller)?.postMessage({type:'CACHE_FRAMES',urls});
+      };
+      if('requestIdleCallback' in window)requestIdleCallback(queueFrames,{timeout:9000});
+      else setTimeout(queueFrames,7000);
+    }catch(_){ }
+  },{once:true});
+}"""
+          s = s.replace(marker, addition, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "perf: pause frame cache while scrolling and cap decoded memory"
+          git push origin master
