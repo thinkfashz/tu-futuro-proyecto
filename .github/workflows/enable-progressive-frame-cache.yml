@@ -1,0 +1,171 @@
+name: Enable progressive frame cache
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/enable-progressive-frame-cache.yml
+
+permissions:
+  contents: write
+
+jobs:
+  enable-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Add cache registration and progressive precache
+        shell: bash
+        run: |
+          cat > sw.js <<'SW'
+          'use strict';
+
+          const VERSION = 'tfp-v3';
+          const SHELL = `${VERSION}-shell`;
+          const FRAMES = `${VERSION}-frames`;
+          const SHELL_FILES = ['./', './index.html', './logo.svg', './og-image.svg', './manifest.webmanifest'];
+
+          self.addEventListener('install', event => {
+            event.waitUntil((async () => {
+              const cache = await caches.open(SHELL);
+              await Promise.allSettled(SHELL_FILES.map(url => cache.add(url)));
+              await self.skipWaiting();
+            })());
+          });
+
+          self.addEventListener('activate', event => {
+            event.waitUntil((async () => {
+              const keys = await caches.keys();
+              await Promise.all(keys.filter(key => key.startsWith('tfp-') && ![SHELL, FRAMES].includes(key)).map(key => caches.delete(key)));
+              await self.clients.claim();
+            })());
+          });
+
+          function isFrame(url) {
+            return url.origin === self.location.origin && url.pathname.includes('/frame/movil/webp/') && /\/\d{3}\.webp$/i.test(url.pathname);
+          }
+
+          async function cacheFirst(request) {
+            const cache = await caches.open(FRAMES);
+            const cached = await cache.match(request);
+            if (cached) return cached;
+            const response = await fetch(request);
+            if (response.ok) await cache.put(request, response.clone()).catch(() => {});
+            return response;
+          }
+
+          self.addEventListener('fetch', event => {
+            const request = event.request;
+            if (request.method !== 'GET') return;
+            const url = new URL(request.url);
+            if (url.origin !== self.location.origin) return;
+
+            if (isFrame(url)) {
+              event.respondWith(cacheFirst(request));
+              return;
+            }
+
+            event.respondWith((async () => {
+              const cache = await caches.open(SHELL);
+              try {
+                const fresh = await fetch(request);
+                if (fresh.ok) event.waitUntil(cache.put(request, fresh.clone()).catch(() => {}));
+                return fresh;
+              } catch (_) {
+                return (await cache.match(request)) || Response.error();
+              }
+            })());
+          });
+
+          async function notify(message) {
+            const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+            clients.forEach(client => client.postMessage(message));
+          }
+
+          let running = null;
+
+          async function cacheFrames(urls) {
+            const connectionSaveData = false;
+            if (connectionSaveData) return;
+            const cache = await caches.open(FRAMES);
+            const unique = [...new Set(urls)];
+            const queue = unique.slice();
+            let done = 0;
+            let failed = 0;
+
+            const worker = async () => {
+              while (queue.length) {
+                const url = queue.shift();
+                const request = new Request(url, { credentials: 'same-origin' });
+                try {
+                  if (!(await cache.match(request))) {
+                    const response = await fetch(request);
+                    if (!response.ok) throw new Error(String(response.status));
+                    await cache.put(request, response.clone());
+                  }
+                } catch (_) {
+                  failed++;
+                } finally {
+                  done++;
+                  if (done === unique.length || done % 12 === 0) {
+                    await notify({ type: 'FRAME_CACHE_PROGRESS', done, failed, total: unique.length });
+                  }
+                }
+              }
+            };
+
+            await Promise.all([worker(), worker()]);
+            await notify({ type: 'FRAME_CACHE_COMPLETE', done, failed, total: unique.length });
+          }
+
+          self.addEventListener('message', event => {
+            const data = event.data || {};
+            if (data.type !== 'CACHE_ALL_FRAMES' || !Array.isArray(data.urls)) return;
+            if (!running) running = cacheFrames(data.urls).finally(() => { running = null; });
+            event.waitUntil(running);
+          });
+          SW
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          marker = '</body>'
+          if 'CACHE_ALL_FRAMES' not in s:
+              script = r'''
+          <script>
+          (()=>{
+            if(!('serviceWorker' in navigator) || !window.isSecureContext) return;
+            const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+            navigator.serviceWorker.register('./sw.js',{scope:'./'}).then(async registration=>{
+              await navigator.serviceWorker.ready;
+              const start=()=>{
+                if(connection&&connection.saveData) return;
+                const worker=registration.active||registration.waiting||registration.installing;
+                if(!worker) return;
+                const urls=Array.from({length:237},(_,i)=>new URL(`frame/movil/webp/${String(i+1).padStart(3,'0')}.webp`,location.href).href);
+                worker.postMessage({type:'CACHE_ALL_FRAMES',urls});
+              };
+              if('requestIdleCallback' in window) requestIdleCallback(start,{timeout:2500});
+              else setTimeout(start,1500);
+            }).catch(()=>{});
+          })();
+          </script>
+          '''
+              if marker not in s:
+                  raise SystemExit('Missing </body>')
+              s=s.replace(marker,script+marker,1)
+              p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Validate and commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html sw.js
+          git commit -m "perf: cache all cinematic frames progressively"
+          git push origin master
