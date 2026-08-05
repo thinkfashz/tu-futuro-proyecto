@@ -1,3 +1,4 @@
+# Trigger: 2026-08-04
 name: Upgrade frame playback and calculator
 
 on:
@@ -190,9 +191,8 @@ addEventListener('resize', () => {
 '''
           s = s[:start] + frame_patch + s[end:]
 
-          old_scroll = "drawFrame(fi);\n      scrollbarFill.style.height = (p * 100) + '%';"
-          new_scroll = "prioritizeAround(fi);\n      drawFrame(fi);\n      scrollbarFill.style.height = (p * 100) + '%';"
-          s = s.replace(old_scroll, new_scroll)
+          s = s.replace("drawFrame(fi);\n      scrollbarFill.style.height = (p * 100) + '%';",
+                        "prioritizeAround(fi);\n      drawFrame(fi);\n      scrollbarFill.style.height = (p * 100) + '%';")
 
           calc_html_anchor = '<div class="calc-selector" data-reveal>'
           service_html = '''<div class="project-type-selector" data-reveal aria-label="Tipo de proyecto">
@@ -243,7 +243,7 @@ function applyProjectFactor(){
     if(card){
       const price = card.querySelector('.tier-price span:nth-child(2)');
       const uf = card.querySelector('.tier-uf');
-      if(price) price.textContent = Math.round(value.perm2/1000).toLocaleString('es-CL') + '.000';
+      if(price) price.textContent = value.perm2.toLocaleString('es-CL');
       if(uf) uf.textContent = value.ufperm2.toLocaleString('es-CL') + ' UF / m²';
     }
   });
