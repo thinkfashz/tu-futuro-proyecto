@@ -20,32 +20,26 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          reps=[
-            ("const FRAME_COUNT=237,DIR='frame/movil/webp/',coarse=matchMedia('(pointer:coarse)').matches;",
-             "const SOURCE_FRAME_COUNT=237,FRAME_STEP=2,FRAME_COUNT=Math.ceil(SOURCE_FRAME_COUNT/FRAME_STEP),DIR='frame/movil/webp/',coarse=matchMedia('(pointer:coarse)').matches;"),
-            ("const MAX=coarse?3:5,INITIAL=coarse?10:16,pad=n=>String(n).padStart(3,'0'),src=i=>DIR+pad(i+1)+'.webp';",
-             "const MAX=coarse?5:7,INITIAL=coarse?16:24,pad=n=>String(n).padStart(3,'0'),src=i=>DIR+pad(Math.min(SOURCE_FRAME_COUNT,(i*FRAME_STEP)+1))+'.webp';"),
-            ("const d=Math.min(coarse?1.05:1.65,devicePixelRatio||1)",
-             "const d=Math.min(coarse?1:1.45,devicePixelRatio||1)"),
-            ("ctx.imageSmoothingQuality='high'",
-             "ctx.imageSmoothingQuality=coarse?'medium':'high'"),
-            ("for(let d=1;d<=14;d++)order.push(i+d*direction);for(let d=1;d<=6;d++)order.push(i-d*direction);",
-             "for(let d=1;d<=28;d++)order.push(i+d*direction);for(let d=1;d<=10;d++)order.push(i-d*direction);"),
-            ("if(queue.length>48){const keep=new Set();queue.splice(0,queue.length,...queue.filter(n=>{if(Math.abs(n-i)>30||keep.has(n))return false;keep.add(n);return true}));queued.clear();queue.forEach(n=>queued.add(n))}",
-             "if(queue.length>56){const keep=new Set();queue.splice(0,queue.length,...queue.filter(n=>{if(Math.abs(n-i)>38||keep.has(n))return false;keep.add(n);return true}));queued.clear();queue.forEach(n=>queued.add(n))}"),
-            ("const p=self.progress,i=Math.round(p*(FRAME_COUNT-1)),direction=i>=current?1:-1;current=i;schedule(i);request(i,direction);",
-             "const p=self.progress,i=Math.round(p*(FRAME_COUNT-1)),delta=i-current,direction=delta>=0?1:-1,lead=Math.min(10,Math.max(2,Math.abs(delta)*2));current=i;schedule(i);request(Math.max(0,Math.min(FRAME_COUNT-1,i+direction*lead)),direction);request(i,direction);"),
-            ("scrub:.035",
-             "scrub:.02"),
-            ("setTimeout(closeLoader,6500)",
-             "setTimeout(closeLoader,5200)")
-          ]
-          for old,new in reps:
-            if old not in s:
-              raise SystemExit(f'Missing expected fragment: {old[:90]}')
-            s=s.replace(old,new,1)
+          s=re.sub(r"const FRAME_COUNT=237,DIR='frame/movil/webp/',coarse=matchMedia\('\(pointer:coarse\)'\)\.matches;",
+                   "const SOURCE_FRAME_COUNT=237,FRAME_STEP=2,FRAME_COUNT=Math.ceil(SOURCE_FRAME_COUNT/FRAME_STEP),DIR='frame/movil/webp/',coarse=matchMedia('(pointer:coarse)').matches;",s,count=1)
+          s=re.sub(r"const MAX=coarse\?\d+:\d+,INITIAL=coarse\?\d+:\d+,pad=n=>String\(n\)\.padStart\(3,'0'\),src=i=>DIR\+pad\(i\+1\)\+'\.webp';",
+                   "const MAX=coarse?5:7,INITIAL=coarse?16:24,pad=n=>String(n).padStart(3,'0'),src=i=>DIR+pad(Math.min(SOURCE_FRAME_COUNT,(i*FRAME_STEP)+1))+'.webp';",s,count=1)
+          s=re.sub(r"const d=Math\.min\(coarse\?[\d.]+:[\d.]+,devicePixelRatio\|\|1\)",
+                   "const d=Math.min(coarse?1:1.45,devicePixelRatio||1)",s,count=1)
+          s=s.replace("ctx.imageSmoothingQuality='high'","ctx.imageSmoothingQuality=coarse?'medium':'high'",1)
+          s=re.sub(r"for\(let d=1;d<=\d+;d\+\+\)order\.push\(i\+d\*direction\);for\(let d=1;d<=\d+;d\+\+\)order\.push\(i-d\*direction\);",
+                   "for(let d=1;d<=28;d++)order.push(i+d*direction);for(let d=1;d<=10;d++)order.push(i-d*direction);",s,count=1)
+          s=re.sub(r"if\(queue\.length>\d+\)\{const keep=new Set\(\);queue\.splice\(0,queue\.length,\.\.\.queue\.filter\(n=>\{if\(Math\.abs\(n-i\)>\d+\|\|keep\.has\(n\)\)return false;keep\.add\(n\);return true\}\)\);queued\.clear\(\);queue\.forEach\(n=>queued\.add\(n\)\)\}",
+                   "if(queue.length>56){const keep=new Set();queue.splice(0,queue.length,...queue.filter(n=>{if(Math.abs(n-i)>38||keep.has(n))return false;keep.add(n);return true}));queued.clear();queue.forEach(n=>queued.add(n))}",s,count=1)
+          s=re.sub(r"const p=self\.progress,i=Math\.round\(p\*\(FRAME_COUNT-1\)\),direction=i>=current\?1:-1;current=i;schedule\(i\);request\(i,direction\);",
+                   "const p=self.progress,i=Math.round(p*(FRAME_COUNT-1)),delta=i-current,direction=delta>=0?1:-1,lead=Math.min(10,Math.max(2,Math.abs(delta)*2));current=i;schedule(i);request(Math.max(0,Math.min(FRAME_COUNT-1,i+direction*lead)),direction);request(i,direction);",s,count=1)
+          s=re.sub(r"scrub:\.[0-9]+","scrub:.02",s,count=1)
+          s=re.sub(r"setTimeout\(closeLoader,\d+\)","setTimeout(closeLoader,5200)",s,count=1)
+          if 'FRAME_STEP=2' not in s:
+              raise SystemExit('frame optimization was not applied')
           p.write_text(s,encoding='utf-8')
           PY
       - name: Commit optimized engine
