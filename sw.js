@@ -1,13 +1,14 @@
 'use strict';
 
-const VERSION = 'tfp-v3';
+const VERSION = 'tfp-v4';
 const SHELL = `${VERSION}-shell`;
 const FRAMES = `${VERSION}-frames`;
 const SHELL_FILES = ['./', './index.html', './logo.svg', './og-image.svg', './manifest.webmanifest'];
 
-let cachePaused = false;
-let cacheQueue = [];
-let cacheRunning = false;
+let lastFrameRequestAt = 0;
+let idleCacheTimer = null;
+let idleCacheRunning = false;
+const pendingFrameUrls = new Set();
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -20,10 +21,58 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key.startsWith('tfp-') && ![SHELL, FRAMES].includes(key)).map(key => caches.delete(key))))
+      .then(keys => Promise.all(
+        keys
+          .filter(key => key.startsWith('tfp-') && ![SHELL, FRAMES].includes(key))
+          .map(key => caches.delete(key))
+      ))
       .then(() => self.clients.claim())
   );
 });
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function scheduleIdleCache() {
+  clearTimeout(idleCacheTimer);
+  idleCacheTimer = setTimeout(() => {
+    cachePendingFrames().catch(() => {});
+  }, 1800);
+}
+
+async function cachePendingFrames() {
+  if (idleCacheRunning || !pendingFrameUrls.size) return;
+  if (Date.now() - lastFrameRequestAt < 1700) {
+    scheduleIdleCache();
+    return;
+  }
+
+  idleCacheRunning = true;
+  const cache = await caches.open(FRAMES);
+
+  try {
+    while (pendingFrameUrls.size) {
+      if (Date.now() - lastFrameRequestAt < 900) break;
+
+      const url = pendingFrameUrls.values().next().value;
+      pendingFrameUrls.delete(url);
+      const request = new Request(url, { credentials: 'same-origin' });
+
+      try {
+        const exists = await cache.match(request);
+        if (!exists) {
+          const response = await fetch(request);
+          if (response.ok) await cache.put(request, response);
+        }
+      } catch (_) {}
+
+      // One slow cache operation at a time, only while the user is idle.
+      await sleep(180);
+    }
+  } finally {
+    idleCacheRunning = false;
+    if (pendingFrameUrls.size) scheduleIdleCache();
+  }
+}
 
 self.addEventListener('fetch', event => {
   const request = event.request;
@@ -34,16 +83,18 @@ self.addEventListener('fetch', event => {
 
   const isFrame = url.pathname.includes('/frame/movil/webp/');
   if (isFrame) {
+    lastFrameRequestAt = Date.now();
+    pendingFrameUrls.add(request.url);
+    scheduleIdleCache();
+
     event.respondWith((async () => {
       const cache = await caches.open(FRAMES);
       const cached = await cache.match(request);
       if (cached) return cached;
 
-      const response = await fetch(request);
-      if (response.ok) {
-        event.waitUntil(cache.put(request, response.clone()).catch(() => {}));
-      }
-      return response;
+      // Return the network response immediately. Do not write to Cache Storage
+      // during active scrolling because that was competing with canvas decoding.
+      return fetch(request);
     })());
     return;
   }
@@ -60,63 +111,15 @@ self.addEventListener('fetch', event => {
   })());
 });
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-async function runCacheQueue() {
-  if (cacheRunning) return;
-  cacheRunning = true;
-  const cache = await caches.open(FRAMES);
-
-  try {
-    while (cacheQueue.length) {
-      if (cachePaused) {
-        await sleep(250);
-        continue;
-      }
-
-      const url = cacheQueue.shift();
-      const request = new Request(url, { credentials: 'same-origin' });
-      try {
-        const exists = await cache.match(request);
-        if (!exists) {
-          const response = await fetch(request);
-          if (response.ok) await cache.put(request, response);
-        }
-      } catch (_) {}
-
-      // Give scrolling, GSAP and canvas painting priority over background cache writes.
-      await sleep(140);
-    }
-  } finally {
-    cacheRunning = false;
-  }
-}
-
 self.addEventListener('message', event => {
   const data = event.data || {};
+  if (data.type !== 'CACHE_FRAMES' || !Array.isArray(data.urls)) return;
 
-  if (data.type === 'PAUSE_FRAME_CACHE') {
-    cachePaused = true;
-    return;
+  for (const value of data.urls) {
+    try {
+      const url = new URL(value, self.location.href);
+      if (url.origin === self.location.origin) pendingFrameUrls.add(url.href);
+    } catch (_) {}
   }
-
-  if (data.type === 'RESUME_FRAME_CACHE') {
-    cachePaused = false;
-    event.waitUntil(runCacheQueue());
-    return;
-  }
-
-  if (data.type === 'CACHE_FRAMES' && Array.isArray(data.urls)) {
-    const known = new Set(cacheQueue);
-    for (const url of data.urls) {
-      try {
-        const parsed = new URL(url, self.location.href);
-        if (parsed.origin === self.location.origin && !known.has(parsed.href)) {
-          known.add(parsed.href);
-          cacheQueue.push(parsed.href);
-        }
-      } catch (_) {}
-    }
-    event.waitUntil(runCacheQueue());
-  }
+  scheduleIdleCache();
 });
