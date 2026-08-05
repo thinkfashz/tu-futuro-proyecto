@@ -1,0 +1,19 @@
+{
+  "name": "Tu Futuro Proyecto",
+  "short_name": "Tu Proyecto",
+  "description": "Construcción, ampliaciones, quinchos y terrazas en Talca y la Región del Maule.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#070710",
+  "theme_color": "#070710",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
