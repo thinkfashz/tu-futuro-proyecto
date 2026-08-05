@@ -1,0 +1,289 @@
+name: Upgrade frame playback and calculator
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/performance-calculator-upgrade.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Patch index
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8-sig')
+
+          s = s.replace('smoothWheel: true, smoothTouch: true, touchMultiplier: 1.5, infinite: false,',
+                        "smoothWheel: true, smoothTouch: false, touchMultiplier: 1.15, infinite: false,")
+
+          start = s.index('/* ===== 2. CANVAS FRAME PLAYER ===== */')
+          end = s.index('/* ===== 3. SCROLL ENGINE ===== */')
+          frame_patch = r'''/* ===== 2. CANVAS FRAME PLAYER — progressive, anti-flash ===== */
+const canvas = document.getElementById('frame-canvas');
+const ctx = canvas.getContext('2d', { alpha:false, desynchronized:true });
+const coarsePointer = matchMedia('(pointer:coarse)').matches;
+const frames = new Array(TOTAL_FRAMES).fill(null);
+const loadingFrames = new Map();
+const failedFrames = new Set();
+let currentFrameIndex = 0;
+let lastGoodImage = null;
+let lastGoodIndex = -1;
+let loaderClosed = false;
+let scrollStarted = false;
+let activeLoads = 0;
+const MAX_LOADS = coarsePointer ? 3 : 5;
+const INITIAL_READY = coarsePointer ? 10 : 14;
+const frameQueue = [];
+
+const loaderFill = document.getElementById('loader-fill');
+const loaderPercent = document.getElementById('loader-percent');
+const loader = document.getElementById('loader');
+
+function pad(n) { return String(n).padStart(3, '0'); }
+function frameUrl(index) { return FRAMES_DIR + pad(index + 1) + '.webp'; }
+
+function resizeCanvas() {
+  const dpr = Math.min(coarsePointer ? 1.25 : 1.75, window.devicePixelRatio || 1);
+  const width = Math.max(1, Math.round(innerWidth * dpr));
+  const height = Math.max(1, Math.round(innerHeight * dpr));
+  if (canvas.width === width && canvas.height === height) return;
+  canvas.width = width;
+  canvas.height = height;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  drawFrame(currentFrameIndex, true);
+}
+
+function nearestLoaded(index) {
+  for (let d = 0; d < TOTAL_FRAMES; d++) {
+    const a = index - d, b = index + d;
+    if (a >= 0 && frames[a]) return a;
+    if (b < TOTAL_FRAMES && frames[b]) return b;
+  }
+  return -1;
+}
+
+function paint(img, index) {
+  const cw = canvas.width, ch = canvas.height;
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  if (!cw || !ch || !iw || !ih) return false;
+  const scale = Math.max(cw / iw, ch / ih);
+  const w = iw * scale, h = ih * scale;
+  ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
+  lastGoodImage = img;
+  lastGoodIndex = index;
+  return true;
+}
+
+function drawFrame(index, force = false) {
+  index = Math.max(0, Math.min(TOTAL_FRAMES - 1, index | 0));
+  if (!force && index === currentFrameIndex && lastGoodImage) return;
+  currentFrameIndex = index;
+  let image = frames[index], imageIndex = index;
+  if (!image) {
+    const near = nearestLoaded(index);
+    if (near >= 0) { image = frames[near]; imageIndex = near; }
+  }
+  if (!image) { image = lastGoodImage; imageIndex = lastGoodIndex; }
+  if (image) {
+    try { if (paint(image, imageIndex)) return; } catch (_) {}
+  }
+  if (!lastGoodImage) {
+    ctx.fillStyle = '#070710';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+function closeLoader() {
+  if (loaderClosed) return;
+  loaderClosed = true;
+  loader.classList.add('hidden');
+  drawFrame(0, true);
+  if (!scrollStarted) {
+    scrollStarted = true;
+    initScrollEngine();
+  }
+}
+
+function updateLoader() {
+  const ready = frames.slice(0, INITIAL_READY).filter(Boolean).length;
+  const pct = Math.min(100, Math.round((ready / INITIAL_READY) * 100));
+  loaderFill.style.width = pct + '%';
+  loaderPercent.textContent = pct + '%';
+  if (ready >= INITIAL_READY) setTimeout(closeLoader, 120);
+}
+
+function enqueueFrame(index, priority = 0) {
+  if (index < 0 || index >= TOTAL_FRAMES || frames[index] || loadingFrames.has(index)) return;
+  if (!frameQueue.some(item => item.index === index)) frameQueue.push({ index, priority });
+  frameQueue.sort((a,b) => b.priority - a.priority);
+  pumpQueue();
+}
+
+function pumpQueue() {
+  while (activeLoads < MAX_LOADS && frameQueue.length) {
+    const { index } = frameQueue.shift();
+    if (frames[index] || loadingFrames.has(index)) continue;
+    activeLoads++;
+    const img = new Image();
+    img.decoding = 'async';
+    loadingFrames.set(index, img);
+    img.onload = async () => {
+      try { if (img.decode) await img.decode(); } catch (_) {}
+      frames[index] = img;
+      loadingFrames.delete(index);
+      failedFrames.delete(index);
+      activeLoads--;
+      if (index === 0 || Math.abs(index-currentFrameIndex) <= 2) drawFrame(currentFrameIndex, true);
+      updateLoader();
+      pumpQueue();
+    };
+    img.onerror = () => {
+      loadingFrames.delete(index);
+      failedFrames.add(index);
+      activeLoads--;
+      pumpQueue();
+      if (index < INITIAL_READY) setTimeout(() => enqueueFrame(index, 120), 1200);
+    };
+    img.src = frameUrl(index);
+  }
+}
+
+function prioritizeAround(index) {
+  enqueueFrame(index, 300);
+  for (let d = 1; d <= 10; d++) {
+    enqueueFrame(index + d, 250 - d);
+    enqueueFrame(index - d, 245 - d);
+  }
+}
+
+function preloadFrames() {
+  resizeCanvas();
+  enqueueFrame(0, 1000);
+  for (let i = 1; i < INITIAL_READY; i++) enqueueFrame(i, 900 - i);
+  setTimeout(closeLoader, 8000);
+  setTimeout(() => {
+    for (let i = INITIAL_READY; i < TOTAL_FRAMES; i++) enqueueFrame(i, 10);
+  }, 700);
+}
+
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { resizeCanvas(); drawFrame(currentFrameIndex, true); ScrollTrigger.refresh(); }, 160);
+}, { passive:true });
+
+'''
+          s = s[:start] + frame_patch + s[end:]
+
+          old_scroll = "drawFrame(fi);\n      scrollbarFill.style.height = (p * 100) + '%';"
+          new_scroll = "prioritizeAround(fi);\n      drawFrame(fi);\n      scrollbarFill.style.height = (p * 100) + '%';"
+          s = s.replace(old_scroll, new_scroll)
+
+          calc_html_anchor = '<div class="calc-selector" data-reveal>'
+          service_html = '''<div class="project-type-selector" data-reveal aria-label="Tipo de proyecto">
+        <button type="button" class="project-type active" data-project="vivienda" data-factor="1">Vivienda</button>
+        <button type="button" class="project-type" data-project="ampliacion" data-factor="0.92">Ampliación</button>
+        <button type="button" class="project-type" data-project="quincho" data-factor="0.78">Quincho</button>
+        <button type="button" class="project-type" data-project="terraza" data-factor="0.58">Terraza</button>
+      </div>
+      <div class="calc-live-summary" id="calc-live-summary" data-reveal>
+        <span>Proyecto seleccionado</span><strong id="project-summary">Vivienda · 100 m² · Intermedio</strong>
+      </div>
+      '''
+          if 'project-type-selector' not in s:
+              s = s.replace(calc_html_anchor, service_html + calc_html_anchor, 1)
+
+          css = r'''
+.project-type-selector{display:grid;grid-template-columns:repeat(4,1fr);gap:.55rem;max-width:680px;margin:1rem auto 0}
+.project-type{border:1px solid var(--line);background:rgba(7,7,16,.76);color:var(--muted);padding:.8rem .45rem;border-radius:6px;font:600 .62rem var(--fb);letter-spacing:.12em;text-transform:uppercase;transition:.25s ease}
+.project-type:hover{border-color:var(--accentdim);color:var(--fg)}
+.project-type.active{background:var(--accent);border-color:var(--accent);color:var(--bg);box-shadow:0 8px 24px rgba(201,169,110,.2)}
+.calc-live-summary{max-width:680px;margin:.8rem auto 0;padding:.7rem 1rem;border:1px solid var(--line);background:rgba(7,7,16,.58);display:flex;align-items:center;justify-content:space-between;gap:1rem;border-radius:6px}
+.calc-live-summary span{font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted2)}
+.calc-live-summary strong{font-size:.72rem;color:var(--accent);text-align:right}
+@media(max-width:640px){.project-type-selector{grid-template-columns:repeat(2,1fr)}.calc-live-summary{align-items:flex-start;flex-direction:column}.calc-live-summary strong{text-align:left}}
+'''
+          if '.project-type-selector{' not in s:
+              s = s.replace('</style>', css + '\n</style>', 1)
+
+          calc_patch = r'''
+/* Calculator project types */
+const baseTierPrices = Object.fromEntries(Object.entries(tierData).map(([key,value]) => [key, { perm2:value.perm2, ufperm2:value.ufperm2 }]));
+let selectedProject = 'vivienda';
+let selectedProjectLabel = 'Vivienda';
+let selectedFactor = 1;
+const projectSummary = document.getElementById('project-summary');
+
+function updateProjectSummary(){
+  const m2 = Math.max(40, Math.min(500, parseFloat(m2Input.value) || 100));
+  const tierName = tierData[selectedTier]?.name || 'Intermedio';
+  if(projectSummary) projectSummary.textContent = `${selectedProjectLabel} · ${m2} m² · ${tierName}`;
+}
+
+function applyProjectFactor(){
+  Object.entries(tierData).forEach(([key,value]) => {
+    value.perm2 = Math.round(baseTierPrices[key].perm2 * selectedFactor / 10000) * 10000;
+    value.ufperm2 = Math.round(baseTierPrices[key].ufperm2 * selectedFactor * 10) / 10;
+    const card = document.querySelector(`.tier-card[data-tier="${key}"]`);
+    if(card){
+      const price = card.querySelector('.tier-price span:nth-child(2)');
+      const uf = card.querySelector('.tier-uf');
+      if(price) price.textContent = Math.round(value.perm2/1000).toLocaleString('es-CL') + '.000';
+      if(uf) uf.textContent = value.ufperm2.toLocaleString('es-CL') + ' UF / m²';
+    }
+  });
+  updateCalc();
+  updateProjectSummary();
+}
+
+document.querySelectorAll('.project-type').forEach(button => {
+  button.addEventListener('click', () => {
+    document.querySelectorAll('.project-type').forEach(b => b.classList.remove('active'));
+    button.classList.add('active');
+    selectedProject = button.dataset.project;
+    selectedProjectLabel = button.textContent.trim();
+    selectedFactor = Number(button.dataset.factor || 1);
+    applyProjectFactor();
+  });
+});
+
+m2Input.addEventListener('input', updateProjectSummary);
+m2Range.addEventListener('input', updateProjectSummary);
+document.querySelectorAll('.tier-card').forEach(card => card.addEventListener('click', updateProjectSummary));
+applyProjectFactor();
+'''
+          marker = '/* ===== 9. START ===== */'
+          if 'Calculator project types' not in s:
+              s = s.replace(marker, calc_patch + '\n\n' + marker)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Validate
+        run: |
+          grep -q 'progressive, anti-flash' index.html
+          grep -q 'project-type-selector' index.html
+          grep -q 'prioritizeAround(fi)' index.html
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "feat: optimize frame playback and upgrade calculator"
+          git push origin HEAD:master
